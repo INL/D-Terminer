@@ -56,5 +56,5 @@ urllib3==1.26.8
 wcwidth==0.2.5
 Wikipedia-API==0.5.4
 wrapt==1.13.3
-zipp==3.7.0
+zipp==3.19.1
 git+https://github.com/BramVanroy/awesome-align.git@astred_compat
