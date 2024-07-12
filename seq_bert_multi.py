@@ -406,6 +406,10 @@ def extract_terms_sbm(dp, domains, iob_or_io, optimiser="AdamW", nr_hidden=1, si
         output_fp = output_dp + output_fn
         pred_sentences = []                         # triple-nested list: sentences, tokens, labels
 
+        
+        def add_to_term_list(term):
+            candidate_term_dict.setdefault(term, []).append(fn)
+
         # iterate over sentences per file
         for sentence_list in sentences:
             sentence = Sentence(sentence_list)      # [token1, token2, ...]
@@ -414,71 +418,23 @@ def extract_terms_sbm(dp, domains, iob_or_io, optimiser="AdamW", nr_hidden=1, si
             # use pretrained model to tag sentence
             print(sentence)
             model.predict(sentence)
-            sentence_pred_string = sentence.to_tagged_string()              # "token1 token2 <I> token3 token4 <B>"
-            split_sentence_pred_string = sentence_pred_string.split()   # [token1, token2, <I>, token3, token4, <B>]
+            sentence_pred_list = [
+                [token.text, (token.tag if token.has_label("iob") else "O")]
+                for token in sentence.tokens
+            ]
+            
+            labelled_entities = [[token.data_point.text, token.value] for token in sentence.labels]
+            current_entity = None
+            for word, label in labelled_entities:
+                if label == 'B':
+                    if current_entity:  # if there's an unfinished entity, add it to the list
+                        add_to_term_list(current_entity)
+                    current_entity = word  # start a new entity
+                elif label == 'I':
+                    current_entity += " " + word # continue the current entity
+            if current_entity:
+                add_to_term_list(current_entity)  # add the last entity to the list
 
-            # turn prediction in string form into nested list with [token, predicted_label] pairs
-            # and include the "O" label (so "I", "O", or (if applicable) "B")
-            sentence_pred_list = []
-            last_term = ""
-            for index, i in enumerate(split_sentence_pred_string):
-                if iob_or_io.lower() == "iob":
-                    if i not in ["<I>", "<B>"]:
-                        if index == (len(split_sentence_pred_string) - 1) \
-                                or split_sentence_pred_string[index + 1] not in ["<I>", "<B>"]:
-                            sentence_pred_list.append([i, "O"])
-                            if last_term:
-                                if last_term.strip() not in candidate_term_dict:
-                                    candidate_term_dict[last_term.strip()] = [fn]
-                                    last_term = ""
-                                else:
-                                    candidate_term_dict[last_term.strip()].append(fn)
-                                    last_term = ""
-                        else:
-                            sentence_pred_list.append([i, split_sentence_pred_string[index + 1][1]])
-                            if split_sentence_pred_string[index + 1] == "<I>":
-                                last_term += i + " "
-                            else:
-                                if last_term:
-                                    if last_term not in candidate_term_dict:
-                                        candidate_term_dict[last_term.strip()] = [fn]
-                                        last_term = i + " "
-                                    else:
-                                        candidate_term_dict[last_term.strip()].append(fn)
-                                        last_term = i + " "
-                                else:
-                                    last_term = i + " "
-                    elif index == (len(split_sentence_pred_string) - 1):
-                        if last_term:
-                            if last_term.strip() not in candidate_term_dict:
-                                candidate_term_dict[last_term.strip()] = [fn]
-                                last_term = ""
-                            else:
-                                candidate_term_dict[last_term.strip()].append(fn)
-                                last_term = ""
-                else:   # IO
-                    if i != "<I>":
-                        if index == (len(split_sentence_pred_string) - 1) \
-                                or split_sentence_pred_string[index + 1] != "<I>":
-                            sentence_pred_list.append([i, "O"])
-                            if last_term:
-                                if last_term.strip() not in candidate_term_dict:
-                                    candidate_term_dict[last_term.strip()] = [fn]
-                                    last_term = ""
-                                else:
-                                    candidate_term_dict[last_term.strip()].append(fn)
-                                    last_term = ""
-                        else:
-                            sentence_pred_list.append([i, split_sentence_pred_string[index + 1][1]])
-                            last_term += i + " "
-                    elif index == (len(split_sentence_pred_string) - 1):
-                        if last_term:
-                            if last_term not in candidate_term_dict:
-                                candidate_term_dict[last_term.strip()] = [fn]
-                                last_term = ""
-                            else:
-                                candidate_term_dict[last_term.strip()].append(fn)
-                                last_term = ""
             pred_sentences.append(sentence_pred_list)
 
         with open(output_fp, "wt", encoding="utf-8") as output_f:
@@ -518,6 +474,11 @@ def extract_terms_sbm(dp, domains, iob_or_io, optimiser="AdamW", nr_hidden=1, si
     return output_dp
 
 
-# prep_corpus_sbm("unseen_corpora/taalkunde/", "nl", tok_nesting="eos")
-# extract_terms_sbm("unseen_corpora/taalkunde/", ["corp", "equi", "htfl", "wind"], "iob", optimiser="AdamW",
-#                   nr_hidden=1, size=512, incl_incorr_tok=True, specific=1, common=1, ood=1, ne=1, partial=1)
+### EXAMPLE USAGE ###
+my_corpus = "unseen_corpora/wind/"
+prep_corpus_sbm(my_corpus, "nl", tok_nesting="eos")
+extract_terms_sbm( 
+    my_corpus, domains=["corp", "equi", "htfl", "wind"], iob_or_io="iob",
+    optimiser="AdamW", nr_hidden=1, size=512, incl_incorr_tok=True,
+    specific=1, common=1, ood=0, ne=0, partial=1,
+)
