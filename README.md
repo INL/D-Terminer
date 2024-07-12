@@ -1,3 +1,14 @@
+Requirements to run:
+- Python 3.12
+- `pip install -r requirements.txt`.
+- Create a directory `lets` with a distribution of lets.
+- Create a directory pretrained_models/seq_bert_multi with D-Terminer models.
+- Create a directory unseen_corpora/your-corpus-name-here/corpus and fill it with .txt files.
+- Edit the example usage in `seq_bert_multi.py` (bottom of the file).
+- Run `python3 seq_bert_multi.py`.
+
+_Original README below._
+
 # D-Terminer
 Repository for the LT3 D-Terminer demo on monolingual and multilingual automatic term extraction, based on the PhD of Ayla Rigouts Terryn (D-TERMINE: Data-driven Term Extraction Methodologies Investigated).
 
